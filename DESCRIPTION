@@ -10,8 +10,10 @@ Description: This package implements the Metropolis-Hastings algorithm for
 Maintainer: Peng Wang <wangpeng21@mails.jlu.edu.cn>
 License: GPL-3
 Encoding: UTF-8
-Depends: R (>= 3.4.0)
+Imports: stats
+Depends: R (>= 3.5.0)
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 LazyData: true
 URL: https://github.com/PengWang96/DistinguishPRP
+BugReports: https://github.com/PengWang96/DistinguishPRP/issues
