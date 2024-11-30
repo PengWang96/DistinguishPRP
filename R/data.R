@@ -49,15 +49,3 @@
 #' \bold{11}. Art. No.: CD000146. <\doi{10.1002/14651858.CD000146.pub4}>
 #' @keywords dataset
 "dat.slf"
-
-#' #' @name k_vec
-#' #' @aliases k_vec
-#' #' @docType data
-#' #' @title Misclassification Probability and k-values for Levels of Heterogeneity
-#' #' @description This dataset contains a vector with 1000 values of \code{k},
-#' #' representing levels of heterogeneity, corresponding to 1000 sampled points of
-#' #' the misclassification probability \eqn{P_{\text{mis}}} in the range of 0 to 0.05.
-#' #' @usage data("k_vec")
-#' #' @format A numeric vector of length 1000 containing k-values.
-#' #' @keywords dataset
-#' "k_vec"
