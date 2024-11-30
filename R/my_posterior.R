@@ -1,21 +1,65 @@
+if (getRversion() >= "2.15.1")  utils::globalVariables(c("k_vec"))
+
 #' Compute Posterior−PRP under distinguishability criterion using Metropolis-Hastings MCMC Algorithm
 #'
-#' Compute Posterior−PRP under distinguishability criterion. This function implements
-#' the Metropolis-Hastings algorithm for Markov Chain Monte Carlo simulations.
-#' @param N Total number of iterations in Metropolis-Hastings algorithm.
-#' @param r Burn-in ratio.
-#' @param m Number of replications for test statistics.
-#' @param hat_beta The original or the simulated estimated effects.
-#' @param hat_sigma_sq The squared standard errors of the estimated effects.
-#' @param test Type of test statistic to be used ("Q" or "Egger").
-#' @param side Type of hypothesis test ("one.side" or "two.side").
-#' @param heterogeneity_level Optional parameter to specify a tolerable heterogeneity level.
-#' @return A list containing the p-value, true effect estimates, and acceptance rate.
+#' This function computes the posterior probability under the distinguishability criterion
+#' using the Metropolis-Hastings algorithm for Markov Chain Monte Carlo (MCMC) simulations.
+#' It is designed to test hypotheses of replicability with tolerable heterogeneity levels.
+#'
+#' @param N Integer. Total number of iterations in the Metropolis-Hastings algorithm.
+#' @param r Numeric. Burn-in ratio, representing the proportion of iterations to discard as burn-in (e.g., `0.05`).
+#' @param m Integer. Number of replications for test statistics.
+#' @param hat_beta Numeric vector. The original or simulated estimated effects.
+#' @param hat_sigma_sq Numeric vector. The squared standard errors corresponding to the estimated effects in `hat_beta`.
+#' @param test Character. Type of test statistic to use. Options are `"Q"` (heterogeneity test) or `"Egger"` (Egger's regression test).
+#' @param side Character. Type of hypothesis test to perform. Options are `"one.side"` (one-tailed) or `"two.side"` (two-tailed).
+#' @param heterogeneity_level Numeric (optional). If provided, specifies a fixed tolerable level of heterogeneity to override `k_vec`.
+#' @param k_vec Numeric vector (optional). A precomputed vector of `k` values, representing heterogeneity levels corresponding to a range of misclassification probabilities (`P_mis`) from 0 to 0.05.
+#'              If `k_vec` is provided, it will be used for sampling during MCMC.
+#'              Example generation: `pvec <- c(10^seq(-10, log10(0.05), 0.01), 0.05); k_vec <- sapply(pvec, inverse_P_mis)`.
+#' @return A list containing the following elements:
+#' \item{p_value}{Numeric. The computed p-value for the test.}
+#' \item{bar_beta}{Numeric vector. The estimated posterior means for each iteration of MCMC.}
+#' \item{acception}{Numeric. The acceptance rate of the Metropolis-Hastings algorithm.}
+#' @details
+#' This function implements a Metropolis-Hastings algorithm to sample from the posterior
+#' distribution of the model parameters under the distinguishability criterion.
+#' If `k_vec` is not provided, the function will throw an error, as it requires precomputed heterogeneity levels.
+#'
+#' The `heterogeneity_level` parameter, if specified, overrides the use of `k_vec` for sampling the heterogeneity levels.
+#' In such cases, a fixed `k` corresponding to the given heterogeneity level will be used throughout the simulation.
+#'
+#' @importFrom stats rnorm runif
 #' @examples
-#' metropolis_hastings(10000, 0.05, 2, c(0.4, 0.6), c(0.1, 0.2))
+#' # Generate k_vec using a logarithmic sequence
+#' pvec <- c(10^seq(-10, log10(0.05), 0.01), 0.05)
+#' k_vec <- sapply(pvec, inverse_P_mis)
+#'
+#' # Run the Metropolis-Hastings MCMC
+#' result <- metropolis_hastings(
+#'   N = 10000,
+#'   r = 0.05,
+#'   m = 2,
+#'   hat_beta = c(0.4, 0.6),
+#'   hat_sigma_sq = c(0.1, 0.2),
+#'   k_vec = k_vec
+#' )
+#'
+#' # Print results
+#' print(result$p_value)
 #' @export
 metropolis_hastings <- function(N, r, m, hat_beta, hat_sigma_sq, test = "Q",
-                                side = "one.side", heterogeneity_level = NULL) {
+                                side = "one.side", heterogeneity_level = NULL, k_vec = NULL) {
+
+  if (is.null(k_vec) & is.null(heterogeneity_level)) {
+    stop("k values corresponding to probability of misclassification or
+         specific heterogeneity level must be provided.")
+  }
+
+  if (!is.null(heterogeneity_level) & !is.null(k_vec)) {
+    warning("Both heterogeneity_level and k_vec are provided. Defaulting to use heterogeneity_level.")
+  }
+
   # Initialization
   k_max <- if (!is.null(heterogeneity_level)) heterogeneity_level else 0.2726814
   # k = 100, 0.5420572, 0.4626489, 0.3349839, 0.2726814 corresponding to P_mis = 0.5, 0.25, 0.2, 0.1, 0.05
@@ -125,10 +169,10 @@ metropolis_hastings <- function(N, r, m, hat_beta, hat_sigma_sq, test = "Q",
 #' @param hat_beta The original or the simulated estimated effects.
 #' @param hat_sigma_sq The squared standard errors of the estimated effects.
 #'
-#' @return A list containing the p-value, bar_beta estimates, and acceptance rate.
+#' @return A list containing the p-value, bar_beta estimates.
 #'
 #' @examples
-#' fixed_effect(10000, 0, 2, c(0.4, 0.6), c(0.1, 0.2))
+#' fixed_effect(10000, 2, c(0.4, 0.6), c(0.1, 0.2))
 #'
 #' @export
 fixed_effect <- function(N, m, hat_beta, hat_sigma_sq) {
@@ -170,10 +214,12 @@ fixed_effect <- function(N, m, hat_beta, hat_sigma_sq) {
 #'
 #' @param hat_beta A numeric vector representing observed effect sizes.
 #' @param hat_sigma_sq A numeric vector representing observed variances. It must have the same length as `hat_beta`.
-#' @param tol The maximum tolerance in integration, default 1e-2.
+#' @param tol The maximum tolerance in integration, default 1e-6.
 #' @return A list containing:
 #'   \item{Integral_Value}{The computed Posterior-PRP value.}
 #'   \item{Integration_Error}{The estimated numerical integration error.}
+#'
+#' @importFrom stats integrate pchisq pf
 #' @examples
 #' # Example usage
 #' hat_beta <- c(1, 1)
@@ -234,6 +280,8 @@ calc_PRP_FE_NumInt <- function(hat_beta, hat_sigma_sq, tol = 1e-6) {
 #' hat_beta <- c(0.5, 1.0, 1.5)
 #' hat_sigma_sq <- c(0.2, 0.3, 0.4)
 #' mean_Q(hat_beta, hat_sigma_sq)
+#'
+#' @export
 mean_Q <- function(hat_beta, hat_sigma_sq) {
   w <- 1 / hat_sigma_sq
   return(sum(w * hat_beta) / sum(w))
@@ -244,10 +292,12 @@ mean_Q <- function(hat_beta, hat_sigma_sq) {
 #' @param hat_beta The original or the simulated estimated effects.
 #' @param hat_sigma_sq The squared standard errors of the estimated effects.
 #' @return A numeric value representing the p-value for Cochran's Q test.
+#' @importFrom stats pchisq
 #' @examples
 #' hat_beta <- c(0.5, 1.0, 1.5)
 #' hat_sigma_sq <- c(0.2, 0.3, 0.4)
 #' frequency_pvalue(hat_beta, hat_sigma_sq)
+#' @export
 frequency_pvalue <- function(hat_beta, hat_sigma_sq) {
   statistic <- T_Q(hat_beta, mean_Q(hat_beta, hat_sigma_sq), 0, hat_sigma_sq)
   p_value <- 1 - pchisq(statistic, df = length(hat_beta) - 1)
@@ -262,6 +312,7 @@ frequency_pvalue <- function(hat_beta, hat_sigma_sq) {
 #' This function calculates the probability of misclassification for a given value of k.
 #' @param k A numeric value representing the level of heterogeneity.
 #' @return Numeric value of the probability of misclassification.
+#' @importFrom stats dnorm
 #' @examples
 #' P_mis(1)
 #' @export
@@ -278,18 +329,18 @@ P_mis <- function(k) {
 
 #' Inverse Probability of Misclassification Function
 #'
-#' This function approximates the inverse function value of P_{mis}(k) using the bisection method.
-#' @param P_mis_val The value of P_{mis} for which the inverse is sought.
+#' This function approximates the inverse function value of \eqn{P_{\text{mis}}(k)} using the bisection method.
+#' @param P_mis_val The value of misclassification probability for which the inverse is sought.
 #' @param lower The lower bound for the bisection method.
 #' @param upper The upper bound for the bisection method.
 #' @param tol The tolerance level for the bisection method.
 #' @param max_iter The maximum number of iterations for the bisection method.
-#' @return Numeric value of the approximate inverse function value of P_{mis}.
+#' @return Numeric value of the approximate inverse function value of \eqn{P_{\text{mis}}}.
 #' @examples
 #' inverse_P_mis(0.05)
 #' @export
 inverse_P_mis <- function(P_mis_val, lower = 1e-6, upper = 100,
-                          tol = 1e-6, max_iter = 1000) {
+                          tol = 1e-10, max_iter = 10^15) {
   root_func <- function(k) P_mis(k) - P_mis_val
   iter <- 0
   while (upper - lower > tol && iter < max_iter) {
@@ -310,6 +361,7 @@ inverse_P_mis <- function(P_mis_val, lower = 1e-6, upper = 100,
 
 
 
+
 #' Function g by log transformation
 #'
 #' This function calculates the log-transformed value of g.
@@ -318,9 +370,7 @@ inverse_P_mis <- function(P_mis_val, lower = 1e-6, upper = 100,
 #' @param hat_sigma_sq The squared standard errors of the estimated effects.
 #' @param k The level of heterogeneity.
 #' @return Numeric value of the log-transformed function g.
-#' @examples
-#' g(0.5, c(0.4, 0.6), c(0.1, 0.2), 1)
-#' @export
+#' @keywords internal
 g <- function(bar_beta, hat_beta, hat_sigma_sq, k) {
   m <- length(hat_beta)  # Number of estimated effects
   sum_log_terms <- 0  # Initialize sum of log terms
@@ -356,9 +406,8 @@ g <- function(bar_beta, hat_beta, hat_sigma_sq, k) {
 #' @param hat_sigma_sq The squared standard errors of the estimated effects.
 #' @param k The level of heterogeneity.
 #' @return Logarithm of the density of the normal distribution for bar_beta_star.
-#' @examples
-#' q(0.5, c(0.4, 0.6), c(0.1, 0.2), 1)
-#' @export
+#' @importFrom stats dnorm
+#' @keywords internal
 q <- function(bar_beta_star, hat_beta, hat_sigma_sq, k) {
   k_max <- k
   res <- dnorm(bar_beta_star,
@@ -443,9 +492,8 @@ egger <- function(hat_beta, bar_beta, k, hat_sigma_sq, m){
 #' @param hat_sigma_sq The squared standard errors of the estimated effects.
 #' @param df Degrees of freedom for the test.
 #' @return p-value for the Hotelling T-squared test.
-#' @examples
-#' hotelling_t_squared(c(0.4, 0.6), c(0.5, 0.7), c(0.1, 0.2), 9500)
-#' @export
+#' @importFrom stats pf
+#' @keywords internal
 hotelling_t_squared <- function(beta_prime_H, hat_beta, hat_sigma_sq, df) {
   S <- diag(hat_sigma_sq)
   m <- length(hat_beta)
@@ -457,13 +505,15 @@ hotelling_t_squared <- function(beta_prime_H, hat_beta, hat_sigma_sq, df) {
 
 
 
-
 #' Combine Results Function
 #'
 #' This function combines the results from multiple Metropolis-Hastings simulations.
 #' @param ... Variable number of Metropolis-Hastings result lists.
 #' @return A list containing combined p-values, bar_beta estimates, and average acceptance rate.
 #' @examples
+#' result1 <- list()
+#' result2 <- list()
+#' result3 <- list()
 #' combine_results(result1, result2, result3)
 #' @export
 combine_results <- function(...) {
@@ -493,7 +543,6 @@ combine_results <- function(...) {
 
 
 
-
 #' Shuffle Function
 #'
 #' This function randomly shuffles elements in a vector.
@@ -519,29 +568,42 @@ shuffle <- function(xv, rep){
 
 #' Simulate Batch Contamination Function
 #'
-#' This function simulates batch contamination in a dataset.
-#' @param bb_sd Standard deviation for batch effects.
-#' @param k Level of heterogeneity.
-#' @param bbar True underlying effect.
-#' @return Vector containing the simulated data.
+#' This function simulates batch contamination in a dataset by incorporating batch effects and heterogeneity in group data.
+#' @param bb_sd Standard deviation for batch effects. This determines the variability of the batch effects in the contaminated groups.
+#' @param k Level of heterogeneity, affecting the variability of the true underlying effect across groups.
+#' @param bbar True underlying effect. This is the baseline effect size which is perturbed by heterogeneity.
+#' @param m Number of groups to simulate.
+#' @param bc_grp_num Number of groups that are batch-contaminated.
+#' @param sample_size Number of samples per group.
+#' @param Gv Matrix of group indicators; each row corresponds to a group and each column to a sample.
+#' @param Batch Matrix of batch effects; structured similarly to the \code{Gv} matrix, with each row corresponding to a group.
+#' @param rnse Standard deviation of the random noise added to the simulation.
+#' @return A vector containing the simulated data, specifically the estimated coefficients and their standard errors from linear models applied to each group.
+#' @importFrom stats rnorm lm
 #' @examples
-#' sim_batch(0.1, 1, 0.5)
+#' rnse <- 1
+#' sample_size <- 5
+#' m <- 1
+#' bc_grp_num <- 1 # number of batch-contaminated groups
+#' Gv <- t(sapply(1:m, function(x) rbinom(sample_size, 1, 0.4)))
+#' Batch <- t(apply(Gv, 1, function(x) shuffle(x, rep=floor(sample_size*0.2))))
+#' sim_batch(0.1, 1, 0.5, 1, bc_grp_num, sample_size, Gv, Batch, rnse)
 #' @export
-sim_batch<-function(bb_sd, k, bbar){
+sim_batch <- function(bb_sd, k, bbar, m, bc_grp_num, sample_size, Gv, Batch, rnse) {
   grp_num <- m
 
   btv = bbar + rnorm(grp_num, sd = sqrt(k^2*bbar^2))
 
   bbv = rep(0, grp_num)
-  bbv[1:bc_grp_num]=rnorm(bc_grp_num, sd = bb_sd)
+  bbv[1:bc_grp_num] = rnorm(bc_grp_num, sd = bb_sd)
 
   rst = c()
-  for (i in 1:grp_num){
+  for (i in 1:grp_num) {
     gv = Gv[i,]
     batch = Batch[i,]
-    y = btv[i]*gv + bbv[i]*batch + rnorm(sample_size, sd=rnse)
-    m = summary(lm(y~gv))
-    rst = c(rst, m$coef[2,1], m$coef[2,2])
+    y = btv[i] * gv + bbv[i] * batch + rnorm(sample_size, sd = rnse)
+    m = summary(lm(y ~ gv))
+    rst = c(rst, m$coef[2, 1], m$coef[2, 2])
   }
 
   return(rst)
@@ -550,14 +612,16 @@ sim_batch<-function(bb_sd, k, bbar){
 
 
 
+
 #' Censoring Function
 #'
 #' This function applies a censoring mechanism based on a power law.
 #' @param p Numeric vector of probabilities to be censored.
+#' @param c Censoring strength
 #' @return Censored probabilities.
 #' @examples
-#' wipi(0.1)
+#' wipi(0.1, 1)
 #' @export
-wipi<-function(p){
+wipi<-function(p, c){
   return(exp(-c*p^(1.5)))
 }
