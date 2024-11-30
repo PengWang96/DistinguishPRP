@@ -182,7 +182,7 @@ print(prp_result)
 ## Data and reproducibility
 
 All the R scripts to reproduce the numeric simulation results and real data analysis in 
-# the manuscript can be found in “paper_repro” folder.
+the manuscript can be found in “paper_repro” folder.
 
 
 # References
