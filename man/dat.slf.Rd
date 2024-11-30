@@ -15,7 +15,7 @@ their within-study variances.
 \source{
 Stead LF, Perera R, Bullen C, Mant D, Hartmann-Boyce J, Cahill K, Lancaster T (2012).
 "Nicotine replacement therapy for smoking cessation." \emph{Cochrane Database of Systematic Reviews},
-\bold{11}. Art. No.: CD000146. <\doi{10.1002/14651858.CD000146.pub4}>
+\bold{11}. Art. No.: CD000146. \if{html}{\out{<\doi{10.1002/14651858.CD000146.pub4}>}}
 }
 \usage{
 data("dat.slf")
